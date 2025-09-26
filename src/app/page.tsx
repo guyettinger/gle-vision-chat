@@ -1,103 +1,226 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
 import Image from "next/image";
+import { useDropzone } from "react-dropzone";
+
+type UploadItem = {
+  id: string;
+  file: File;
+  preview: string; // data URL
+  status: "idle" | "uploading" | "done" | "error";
+  answer?: string;
+  error?: string;
+};
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const [question, setQuestion] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    setGlobalError(null);
+    try {
+      const remaining = Math.max(0, 4 - items.length);
+      const files = acceptedFiles.slice(0, remaining);
+      if (acceptedFiles.length > remaining) {
+        const msg = "You can upload up to 4 images.";
+        console.warn(msg);
+        setGlobalError(msg);
+      }
+
+      const readFileAsDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = (e) => reject(e);
+          reader.readAsDataURL(file);
+        });
+
+      const newItems: UploadItem[] = [];
+      for (const file of files) {
+        const preview = await readFileAsDataUrl(file);
+        newItems.push({
+          id: crypto.randomUUID(),
+          file,
+          preview,
+          status: "idle",
+        });
+      }
+
+      setItems((prev) => [...prev, ...newItems]);
+    } catch (err) {
+      console.error("Error processing dropped files:", err);
+      setGlobalError("Failed to process uploaded images.");
+    }
+  }, [items.length]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "image/*": [] },
+    maxFiles: 4,
+    multiple: true,
+  });
+
+  const canSubmit = useMemo(() => {
+    return question.trim().length > 0 && items.length > 0 && !submitting;
+  }, [question, items.length, submitting]);
+
+  async function handleAnalyze() {
+    setGlobalError(null);
+    if (!canSubmit) return;
+    try {
+      setSubmitting(true);
+      setItems((prev) => prev.map((it) => ({ ...it, status: "uploading", answer: undefined, error: undefined })));
+
+      const res = await fetch("/api/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: question.trim(),
+          images: items.map((i) => i.preview),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data?.error || `Request failed with status ${res.status}`;
+        console.error("API error:", msg);
+        setGlobalError(msg);
+        setItems((prev) => prev.map((it) => ({ ...it, status: "error", error: msg })));
+        return;
+      }
+
+      const data: { results: { index: number; ok: boolean; text?: string; error?: string }[] } = await res.json();
+
+      setItems((prev) =>
+        prev.map((it, idx) => {
+          const r = data.results.find((x) => x.index === idx);
+          if (!r) return { ...it, status: "error", error: "No response" };
+          if (r.ok) return { ...it, status: "done", answer: r.text };
+          return { ...it, status: "error", error: r.error || "Error" };
+        })
+      );
+    } catch (err: any) {
+      console.error("Unexpected client error:", err);
+      setGlobalError(err?.message || "Unexpected error.");
+      setItems((prev) => prev.map((it) => ({ ...it, status: "error", error: "Unexpected error" })));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function removeItem(id: string) {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  function clearAll() {
+    setItems([]);
+    setGlobalError(null);
+  }
+
+  return (
+    <div className="min-h-screen p-6 sm:p-10">
+      <main className="mx-auto max-w-3xl w-full space-y-6">
+        <div className="flex items-center gap-3">
+          <Image src="/next.svg" alt="Logo" width={120} height={30} className="dark:invert" />
+          <span className="text-xl font-semibold">Batch Image QA (GPT-4 Vision)</span>
         </div>
+
+        <section>
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition ${
+              isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 dark:border-gray-700"
+            }`}
+          >
+            <input {...getInputProps()} />
+            <p className="text-sm text-muted-foreground">
+              Drag and drop up to 4 images here, or click to select.
+            </p>
+          </div>
+          {globalError && (
+            <p className="text-sm text-red-600 mt-2" role="alert">{globalError}</p>
+          )}
+          {items.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {items.map((item, idx) => (
+                <div key={item.id} className="relative rounded-md overflow-hidden border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.preview} alt={`upload-${idx}`} className="h-32 w-full object-cover" />
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="absolute top-1 right-1 bg-black/60 text-white text-xs px-2 py-1 rounded"
+                    aria-label="Remove image"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <label className="block text-sm font-medium">Your question</label>
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="e.g., Are there any visible defects or issues?"
+            className="w-full rounded-md border px-3 py-2 bg-background"
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={handleAnalyze}
+              disabled={!canSubmit}
+              className={`px-4 py-2 rounded-md text-white ${canSubmit ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-400 cursor-not-allowed"}`}
+            >
+              {submitting ? "Analyzing..." : "Analyze all images"}
+            </button>
+            {items.length > 0 && (
+              <button onClick={clearAll} className="px-4 py-2 rounded-md border">Clear</button>
+            )}
+          </div>
+        </section>
+
+        {items.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Results</h2>
+            <div className="space-y-4">
+              {items.map((item, idx) => (
+                <div key={item.id} className="flex items-start gap-3">
+                  <div className="w-20 h-20 relative flex-shrink-0 overflow-hidden rounded-md border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.preview} alt={`preview-${idx}`} className="object-cover w-full h-full" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="rounded-lg p-3 border bg-muted">
+                      {item.status === "uploading" && <p className="text-sm">Analyzing...</p>}
+                      {item.status === "done" && (
+                        <p className="text-sm whitespace-pre-wrap">{item.answer}</p>
+                      )}
+                      {item.status === "error" && (
+                        <p className="text-sm text-red-600" role="alert">{item.error || "Error"}</p>
+                      )}
+                      {item.status === "idle" && (
+                        <p className="text-sm text-muted-foreground">Ready to analyze.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <footer className="pt-8 text-xs text-muted-foreground">
+          <p>
+            This demo uses: React Dropzone, Vercel AI SDK (@ai-sdk/react & ai), OpenAI GPT-4 Vision (gpt-4o-mini).
+          </p>
+        </footer>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
