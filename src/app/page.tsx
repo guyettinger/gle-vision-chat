@@ -1,25 +1,53 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
 
+// Types for the current (unsent) attachments in the composer
 type UploadItem = {
   id: string;
   file: File;
   preview: string;
-  status: 'idle' | 'uploading' | 'done' | 'error';
-  answer?: string;
-  error?: string;
 };
 
+// Types for chat history
+type AssistantResult = {
+  index: number;
+  ok: boolean;
+  text?: string;
+  error?: string;
+  image: string; // data url of the image for the message context
+};
+
+type ChatMessage =
+  | {
+      id: string;
+      role: 'user';
+      question: string;
+      images: string[];
+      createdAt: number;
+    }
+  | {
+      id: string;
+      role: 'assistant';
+      results: AssistantResult[];
+      createdAt: number;
+      pending?: boolean;
+    };
+
 export default function Home() {
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Composer state
   const [items, setItems] = useState<UploadItem[]>([]);
   const [question, setQuestion] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
+  // Dropzone
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       setGlobalError(null);
@@ -43,12 +71,7 @@ export default function Home() {
         const newItems: UploadItem[] = [];
         for (const file of files) {
           const preview = await readFileAsDataUrl(file);
-          newItems.push({
-            id: crypto.randomUUID(),
-            file,
-            preview,
-            status: 'idle',
-          });
+          newItems.push({ id: crypto.randomUUID(), file, preview });
         }
 
         setItems(prev => [...prev, ...newItems]);
@@ -60,13 +83,17 @@ export default function Home() {
     [items.length]
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'image/*': [] },
-    maxFiles: 4,
-    multiple: true,
-  });
+  const { getRootProps, getInputProps, isDragActive, open: openFileDialog } =
+    useDropzone({
+      onDrop,
+      accept: { 'image/*': [] },
+      maxFiles: 4,
+      multiple: true,
+      noClick: true,
+      noKeyboard: true,
+    });
 
+  // Derived
   const canSubmit = useMemo(() => {
     return question.trim().length > 0 && items.length > 0 && !submitting;
   }, [question, items.length, submitting]);
@@ -75,6 +102,7 @@ export default function Home() {
     results: { index: number; ok: boolean; text?: string; error?: string }[];
   };
 
+  // Mutation using fetch to the API (already set up server-side)
   const analyzeMutation = useMutation({
     mutationFn: async (payload: {
       question: string;
@@ -99,42 +127,89 @@ export default function Home() {
     },
   });
 
+  // Handlers
   async function handleAnalyze() {
     setGlobalError(null);
     if (!canSubmit) return;
+
+    const images = items.map(i => i.preview);
+    const q = question.trim();
+
     try {
       setSubmitting(true);
-      setItems(prev =>
-        prev.map(it => ({
-          ...it,
-          status: 'uploading',
-          answer: undefined,
-          error: undefined,
-        }))
-      );
 
+      // Add user message
+      const userId = crypto.randomUUID();
+      const assistantId = crypto.randomUUID();
+      const createdAt = Date.now();
+
+      setMessages(prev => [
+        ...prev,
+        { id: userId, role: 'user', question: q, images, createdAt },
+        {
+          id: assistantId,
+          role: 'assistant',
+          createdAt,
+          pending: true,
+          results: images.map((img, idx) => ({
+            index: idx,
+            ok: true,
+            text: 'Analyzing...',
+            image: img,
+          })),
+        },
+      ]);
+
+      // Call API
       const data = await analyzeMutation.mutateAsync({
-        question: question.trim(),
-        images: items.map(i => i.preview),
+        question: q,
+        images,
       });
 
-      setItems(prev =>
-        prev.map((it, idx) => {
-          const r = data.results.find(x => x.index === idx);
-          if (!r) return { ...it, status: 'error', error: 'No response' };
-          if (r.ok) return { ...it, status: 'done', answer: r.text };
-          return { ...it, status: 'error', error: r.error || 'Error' };
+      // Update assistant message with real results
+      setMessages(prev =>
+        prev.map(m => {
+          if (m.role === 'assistant' && m.pending && m.createdAt === createdAt) {
+            const results: AssistantResult[] = images.map((img, idx) => {
+              const r = data.results.find(x => x.index === idx);
+              return {
+                index: idx,
+                ok: !!r?.ok,
+                text: r?.text,
+                error: r?.error,
+                image: img,
+              };
+            });
+            return { ...m, pending: false, results };
+          }
+          return m;
         })
       );
+
+      // Clear composer for next question
+      setItems([]);
+      setQuestion('');
     } catch (err: any) {
       console.error('Unexpected client error:', err);
       setGlobalError(err?.message || 'Unexpected error.');
-      setItems(prev =>
-        prev.map(it => ({
-          ...it,
-          status: 'error',
-          error: err?.message || 'Unexpected error',
-        }))
+
+      // Mark assistant message as error for this request if exists
+      setMessages(prev =>
+        prev.map(m => {
+          if (m.role === 'assistant' && m.pending) {
+            return {
+              ...m,
+              pending: false,
+              results: m.results.map(r => ({
+                ...r,
+                ok: false,
+                text: undefined,
+                error: err?.message || 'Unexpected error',
+              })),
+            };
+          }
+          return m;
+        })
       );
     } finally {
       setSubmitting(false);
@@ -150,143 +225,168 @@ export default function Home() {
     setGlobalError(null);
   }
 
+  // Auto-scroll to bottom when messages change
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages]);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (canSubmit) void handleAnalyze();
+    }
+  }
+
   return (
-    <div className="min-h-screen p-6 sm:p-10">
-      <main className="mx-auto max-w-3xl w-full space-y-6">
-        <div className="flex items-center gap-3">
-          <Image
-            src="/next.svg"
-            alt="Logo"
-            width={120}
-            height={30}
-            className="dark:invert"
-          />
-          <span className="text-xl font-semibold">
-            Batch Image QA (GPT-4 Vision)
-          </span>
+    <div className="min-h-screen">
+      {/* Page header */}
+      <header className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto max-w-3xl w-full px-4 sm:px-6 py-4 flex items-center gap-3">
+          <Image src="/next.svg" alt="Logo" width={120} height={30} className="dark:invert" />
+          <span className="text-xl font-semibold">Batch Image QA (GPT-4 Vision)</span>
+        </div>
+      </header>
+
+      {/* Chat area */}
+      <main className="mx-auto max-w-3xl w-full h-[calc(100vh-64px)] flex flex-col">
+        {/* Messages list */}
+        <div ref={listRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+          {messages.length === 0 && (
+            <div className="text-center text-sm text-muted-foreground pt-16">
+              <p>Drop up to 4 product images and ask a question. I will analyze each image and reply per-image.</p>
+            </div>
+          )}
+
+          {messages.map(msg => {
+            if (msg.role === 'user') {
+              return (
+                <div key={msg.id} className="flex justify-end">
+                  <div className="max-w-[80%] rounded-2xl border bg-blue-600 text-white px-4 py-3 shadow">
+                    <p className="whitespace-pre-wrap text-sm">{msg.question}</p>
+                    {msg.images.length > 0 && (
+                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {msg.images.map((img, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={i} src={img} alt={`user-img-${i}`} className="h-20 w-full object-cover rounded-md border border-white/20" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            // assistant
+            return (
+              <div key={msg.id} className="flex justify-start">
+                <div className="max-w-[90%] rounded-2xl border bg-muted px-4 py-3 shadow w-full">
+                  <div className="space-y-3">
+                    {msg.results.map((res, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={res.image} alt={`result-${i}`} className="w-16 h-16 rounded-md object-cover border" />
+                        <div className="flex-1">
+                          {msg.pending ? (
+                            <p className="text-sm text-muted-foreground">Analyzing...</p>
+                          ) : res.ok ? (
+                            <p className="text-sm whitespace-pre-wrap">{res.text}</p>
+                          ) : (
+                            <p className="text-sm text-red-600" role="alert">{res.error || 'Error'}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        <section>
-          <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition ${
-              isDragActive
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 dark:border-gray-700'
-            }`}
-          >
-            <input {...getInputProps()} />
-            <p className="text-sm text-muted-foreground">
-              Drag and drop up to 4 images here, or click to select.
-            </p>
-          </div>
+        {/* Composer (sticky bottom) */}
+        <div
+          {...getRootProps()}
+          className={`border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sm:px-6 py-3 sticky bottom-0`}
+        >
+          <input {...getInputProps()} />
+
           {globalError && (
-            <p className="text-sm text-red-600 mt-2" role="alert">
-              {globalError}
-            </p>
+            <p className="text-xs text-red-600 mb-2" role="alert">{globalError}</p>
           )}
+
+          {/* Selected thumbnails */}
           {items.length > 0 && (
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="mb-2 flex flex-wrap gap-2">
               {items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="relative rounded-md overflow-hidden border"
-                >
+                <div key={item.id} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.preview}
-                    alt={`upload-${idx}`}
-                    className="h-32 w-full object-cover"
+                    alt={`thumb-${idx}`}
+                    className="h-14 w-14 object-cover rounded-md border"
                   />
                   <button
-                    onClick={() => removeItem(item.id)}
-                    className="absolute top-1 right-1 bg-black/60 text-white text-xs px-2 py-1 rounded"
+                    onClick={e => {
+                      e.stopPropagation();
+                      removeItem(item.id);
+                    }}
+                    className="absolute -top-1 -right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded"
                     aria-label="Remove image"
                   >
-                    Remove
+                    ✕
                   </button>
                 </div>
               ))}
             </div>
           )}
-        </section>
 
-        <section className="space-y-3">
-          <label className="block text-sm font-medium">Your question</label>
-          <input
-            type="text"
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            placeholder="e.g., Are there any visible defects or issues?"
-            className="w-full rounded-md border px-3 py-2 bg-background"
-          />
-          <div className="flex gap-3">
+          {/* Input row */}
+          <div className={`flex items-center gap-2 ${isDragActive ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}>
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                openFileDialog();
+              }}
+              className="px-3 py-2 rounded-md border text-sm"
+              disabled={submitting || items.length >= 4}
+            >
+              Add images
+            </button>
+            <input
+              type="text"
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask a question about your images..."
+              className="flex-1 rounded-md border px-3 py-2 bg-background text-sm"
+              disabled={submitting}
+            />
             <button
               onClick={handleAnalyze}
               disabled={!canSubmit}
-              className={`px-4 py-2 rounded-md text-white ${canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+              className={`px-4 py-2 rounded-md text-white text-sm ${canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
             >
-              {submitting ? 'Analyzing...' : 'Analyze all images'}
+              {submitting ? 'Analyzing...' : 'Send'}
             </button>
             {items.length > 0 && (
               <button
-                onClick={clearAll}
-                className="px-4 py-2 rounded-md border"
+                onClick={e => {
+                  e.stopPropagation();
+                  clearAll();
+                }}
+                className="px-3 py-2 rounded-md border text-sm"
+                disabled={submitting}
               >
                 Clear
               </button>
             )}
           </div>
-        </section>
 
-        {items.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Results</h2>
-            <div className="space-y-4">
-              {items.map((item, idx) => (
-                <div key={item.id} className="flex items-start gap-3">
-                  <div className="w-20 h-20 relative flex-shrink-0 overflow-hidden rounded-md border">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.preview}
-                      alt={`preview-${idx}`}
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="rounded-lg p-3 border bg-muted">
-                      {item.status === 'uploading' && (
-                        <p className="text-sm">Analyzing...</p>
-                      )}
-                      {item.status === 'done' && (
-                        <p className="text-sm whitespace-pre-wrap">
-                          {item.answer}
-                        </p>
-                      )}
-                      {item.status === 'error' && (
-                        <p className="text-sm text-red-600" role="alert">
-                          {item.error || 'Error'}
-                        </p>
-                      )}
-                      {item.status === 'idle' && (
-                        <p className="text-sm text-muted-foreground">
-                          Ready to analyze.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <footer className="pt-8 text-xs text-muted-foreground">
-          <p>
-            This demo uses: React Dropzone, Vercel AI SDK (@ai-sdk/react & ai),
-            OpenAI GPT-4 Vision (gpt-4o-mini).
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Tip: You can drag & drop up to 4 images onto this area. Press Enter to send.
           </p>
-        </footer>
+        </div>
       </main>
     </div>
   );
