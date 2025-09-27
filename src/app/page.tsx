@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
+import ThemeToggle from '@/components/theme-toggle';
 
 // Types for the current (unsent) attachments in the composer
 type UploadItem = {
@@ -242,9 +243,12 @@ export default function Home() {
     <div className="min-h-screen">
       {/* Page header */}
       <header className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto max-w-3xl w-full px-4 sm:px-6 py-4 flex items-center gap-3">
-          <Image src="/next.svg" alt="Logo" width={120} height={30} className="dark:invert" />
-          <span className="text-xl font-semibold">Batch Image QA (GPT-4 Vision)</span>
+        <div className="mx-auto max-w-3xl w-full px-4 sm:px-6 py-4 flex items-center gap-3 justify-between">
+          <div className="flex items-center gap-3">
+            <Image src="/next.svg" alt="Logo" width={120} height={30} className="dark:invert" />
+            <span className="text-xl font-semibold">Batch Image QA (GPT-4 Vision)</span>
+          </div>
+          <ThemeToggle />
         </div>
       </header>
 

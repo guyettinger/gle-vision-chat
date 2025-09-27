@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { OPENAI_API_KEY } from '@/lib/config';
 
 const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: OPENAI_API_KEY,
 });
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY) {
       console.error('OPENAI_API_KEY is not set');
       return NextResponse.json(
         { error: 'Server configuration error: missing OpenAI API key' },
