@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
-import ThemeToggle from '@/components/theme-toggle';
+import ThemeToggle from '@/components/ThemeToggle';
 
 // Types for the current (unsent) attachments in the composer
 type UploadItem = {
@@ -245,8 +245,8 @@ export default function Home() {
       <header className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-3xl w-full px-4 sm:px-6 py-4 flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/next.svg" alt="Logo" width={120} height={30} className="dark:invert" />
-            <span className="text-xl font-semibold">Batch Image QA (GPT-4 Vision)</span>
+            <Image src="/avatar.png" alt="Logo" width={32} height={32} className="dark:invert" />
+            <span className="text-xl font-semibold">Vision Chat</span>
           </div>
           <ThemeToggle />
         </div>
@@ -258,7 +258,7 @@ export default function Home() {
         <div ref={listRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center text-sm text-muted-foreground pt-16">
-              <p>Drop up to 4 product images and ask a question. I will analyze each image and reply per-image.</p>
+              <p>Drop up to 4 images and ask a question. I will analyze each image and reply per-image.</p>
             </div>
           )}
 
