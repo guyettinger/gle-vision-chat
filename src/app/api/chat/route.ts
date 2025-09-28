@@ -3,9 +3,19 @@ import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { OPENAI_API_KEY } from '@/lib/config';
+import { isErrorWithMessage } from '@/types/error';
 
 const openai = createOpenAI({
   apiKey: OPENAI_API_KEY,
+});
+
+const ChatResponseSchema = z.object({
+  results: z.array(
+    z.object({
+      index: z.number(),
+      text: z.string(),
+    })
+  ),
 });
 
 export async function POST(req: Request) {
@@ -48,16 +58,6 @@ export async function POST(req: Request) {
 
     const model = openai('gpt-4o-mini');
 
-    // Define the schema for the structured output
-    const responseSchema = z.object({
-      results: z.array(
-        z.object({
-          index: z.number(),
-          text: z.string(),
-        })
-      ),
-    });
-
     // Create content array with text and all images
     const content = [
       {
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     try {
       const { object } = await generateObject({
         model,
-        schema: responseSchema,
+        schema: ChatResponseSchema,
         messages: [
           {
             role: 'user',
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
         ],
       });
 
-      // Transform the results to match the original format
+      // Transform the results to an array
       const results = images.map((_, index) => {
         const result = object.results.find(r => r.index === index);
         if (result) {
@@ -97,23 +97,23 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({ results });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = isErrorWithMessage(error)
+        ? error.message
+        : 'Failed to analyze images. Please try again.';
       console.error('OpenAI error:', error);
-
-      // Fallback to individual results with error for all images
       const results = images.map((_, index) => ({
         index,
         ok: false,
-        error: error?.message || 'Failed to analyze images. Please try again.',
+        error: message,
       }));
-
       return NextResponse.json({ results });
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = isErrorWithMessage(err)
+      ? err.message
+      : 'Unexpected server error';
     console.error('Unexpected server error:', err);
-    return NextResponse.json(
-      { error: 'Unexpected server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

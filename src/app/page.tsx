@@ -5,9 +5,10 @@ import { useDropzone } from 'react-dropzone';
 import Header from '@/components/Header';
 import MessagesList from '@/components/MessagesList';
 import { UploadItem, AssistantResult, ChatMessage } from '@/types/chat';
-import { readFileAsDataUrl } from '@/lib/file';
+import { readFileAsDataUrl } from '@/lib/files';
 import { useWindowDropzone } from '@/hooks/useWindowDropzone';
-import { useChatMutation } from '@/hooks/useChatMutation';
+import { useChat } from '@/hooks/useChat';
+import { isErrorWithMessage } from '@/types/error';
 
 export default function Home() {
   // Chat state
@@ -71,8 +72,8 @@ export default function Home() {
     return question.trim().length > 0 && items.length > 0 && !submitting;
   }, [question, items.length, submitting]);
 
-  // Mutation using fetch to the API (already set up server-side)
-  const chatMutation = useChatMutation();
+  // chat
+  const chatMutation = useChat();
 
   // Handlers
   async function handleAnalyze() {
@@ -140,9 +141,12 @@ export default function Home() {
       // Clear composer for next question
       setItems([]);
       setQuestion('');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = isErrorWithMessage(err)
+        ? err.message
+        : 'Unexpected client error';
       console.error('Unexpected client error:', err);
-      setGlobalError(err?.message || 'Unexpected error.');
+      setGlobalError(message);
 
       // Mark assistant message as error for this request if exists
       setMessages(prev =>
@@ -155,7 +159,7 @@ export default function Home() {
                 ...r,
                 ok: false,
                 text: undefined,
-                error: err?.message || 'Unexpected error',
+                error: message,
               })),
             };
           }
