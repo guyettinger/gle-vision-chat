@@ -101,7 +101,7 @@ export default function Home() {
       question: string;
       images: string[];
     }): Promise<BatchResult> => {
-      const res = await fetch('/api/batch', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
