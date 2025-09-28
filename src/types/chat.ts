@@ -30,6 +30,3 @@ export type ChatMessage =
       pending?: boolean;
     };
 
-export type BatchResult = {
-  results: { index: number; ok: boolean; text?: string; error?: string }[];
-};

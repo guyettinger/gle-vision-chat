@@ -1,17 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, KeyboardEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useMutation } from '@tanstack/react-query';
 import Header from '@/components/Header';
 import MessagesList from '@/components/MessagesList';
-import {
-  UploadItem,
-  AssistantResult,
-  ChatMessage,
-  BatchResult,
-} from '@/types/chat';
+import { UploadItem, AssistantResult, ChatMessage } from '@/types/chat';
 import { readFileAsDataUrl } from '@/lib/file';
+import { useWindowDropzone } from '@/hooks/useWindowDropzone';
+import { useChatMutation } from '@/hooks/useChatMutation';
 
 export default function Home() {
   // Chat state
@@ -23,7 +19,7 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  // Dropzone
+  // Handle dropped images
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       setGlobalError(null);
@@ -51,6 +47,7 @@ export default function Home() {
     [items.length]
   );
 
+  // Dropzone
   const {
     getRootProps,
     getInputProps,
@@ -66,59 +63,16 @@ export default function Home() {
     noDragEventsBubbling: true,
   });
 
-  // Global drag-and-drop anywhere on the page
-  useEffect(() => {
-    function onWindowDragOver(e: DragEvent) {
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    }
-    async function onWindowDrop(e: DragEvent) {
-      e.preventDefault();
-      const dt = e.dataTransfer;
-      if (!dt) return;
-      const files = Array.from(dt.files || []).filter(f =>
-        f.type.startsWith('image/')
-      );
-      if (files.length === 0) return;
-      await onDrop(files);
-    }
-    window.addEventListener('dragover', onWindowDragOver);
-    window.addEventListener('drop', onWindowDrop);
-    return () => {
-      window.removeEventListener('dragover', onWindowDragOver);
-      window.removeEventListener('drop', onWindowDrop);
-    };
-  }, [onDrop]);
+  // Window Dropzone
+  useWindowDropzone({ onDrop });
 
-  // Derived
+  // Submission
   const canSubmit = useMemo(() => {
     return question.trim().length > 0 && items.length > 0 && !submitting;
   }, [question, items.length, submitting]);
 
   // Mutation using fetch to the API (already set up server-side)
-  const analyzeMutation = useMutation({
-    mutationFn: async (payload: {
-      question: string;
-      images: string[];
-    }): Promise<BatchResult> => {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      let data: any = undefined;
-      try {
-        data = await res.json();
-      } catch {
-        // ignore json parse error; will be handled by !res.ok branch
-      }
-      if (!res.ok) {
-        const msg = data?.error || `Request failed with status ${res.status}`;
-        throw new Error(msg);
-      }
-      return data as BatchResult;
-    },
-  });
+  const chatMutation = useChatMutation();
 
   // Handlers
   async function handleAnalyze() {
@@ -154,7 +108,7 @@ export default function Home() {
       ]);
 
       // Call API
-      const data = await analyzeMutation.mutateAsync({
+      const data = await chatMutation.mutateAsync({
         question: q,
         images,
       });
@@ -222,7 +176,7 @@ export default function Home() {
     setGlobalError(null);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (canSubmit) void handleAnalyze();
@@ -320,11 +274,6 @@ export default function Home() {
               </button>
             )}
           </div>
-
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Tip: You can drag & drop up to 4 images anywhere on the page. Press
-            Enter to send.
-          </p>
         </div>
       </main>
     </div>
