@@ -1,6 +1,9 @@
 'use client';
 
 import { Header } from '@/components/Header';
+import { PaperPlaneIcon } from '@/components/icons/PaperPlaneIcon';
+import { TrashIcon } from '@/components/icons/TrashIcon';
+import { TrayArrowDownIcon } from '@/components/icons/TrayArrowDownIcon';
 import { MessagesList } from '@/components/MessagesList';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import { useWindowDropzone } from '@/hooks/useWindowDropzone';
@@ -218,7 +221,9 @@ export default function Home() {
         {/* Composer (sticky bottom) */}
         <div
           {...getRootProps()}
-          className={`border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sm:px-6 py-3 sticky bottom-0`}
+          className={`sticky bottom-0 px-4 sm:px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 
+            border-2 border-dashed rounded-xl transition-all 
+            ${isDragActive ? 'border-blue-600 ring-4 ring-blue-500/40 bg-blue-50/60' : 'border-border bg-background/95'}`}
         >
           <input {...getInputProps()} />
 
@@ -237,7 +242,7 @@ export default function Home() {
                   <img
                     src={item.preview}
                     alt={`thumb-${idx}`}
-                    className="h-14 w-14 object-cover rounded-md border"
+                    className="h-30 w-30 object-cover rounded-md border"
                   />
                   <button
                     onClick={e => {
@@ -255,19 +260,19 @@ export default function Home() {
           )}
 
           {/* Input row */}
-          <div
-            className={`flex items-center gap-2 ${isDragActive ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}
-          >
+          <div className={`flex items-center gap-2`}>
             <button
               type="button"
               onClick={e => {
                 e.stopPropagation();
                 openFileDialog();
               }}
-              className="px-3 py-2 rounded-md border text-sm"
+              className="px-3 py-2 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-accent/40"
               disabled={submitting || items.length >= 4}
+              aria-label="Add images (you can also drop images here)"
             >
-              Add images
+              <TrayArrowDownIcon className="text-foreground/80" />
+              <span>Add images</span>
             </button>
             <input
               type="text"
@@ -281,9 +286,11 @@ export default function Home() {
             <button
               onClick={handleAnalyze}
               disabled={!canSubmit}
-              className={`px-4 py-2 rounded-md text-white text-sm ${canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+              className={`px-4 py-2 rounded-md text-white text-sm inline-flex items-center gap-2 ${canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+              aria-label={submitting ? 'Analyzing' : 'Send message'}
             >
-              {submitting ? 'Analyzing...' : 'Send'}
+              <PaperPlaneIcon className="text-white" />
+              <span>{submitting ? 'Analyzing...' : 'Send'}</span>
             </button>
             {items.length > 0 && (
               <button
@@ -291,10 +298,12 @@ export default function Home() {
                   e.stopPropagation();
                   clearAll();
                 }}
-                className="px-3 py-2 rounded-md border text-sm"
+                className="px-3 py-2 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-accent/40"
                 disabled={submitting}
+                aria-label="Clear selected images"
               >
-                Clear
+                <TrashIcon className="text-foreground/90" />
+                <span>Clear</span>
               </button>
             )}
           </div>
