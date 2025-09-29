@@ -1,14 +1,43 @@
 'use client';
 
-import { useCallback, useMemo, useState, KeyboardEvent } from 'react';
+import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Header from '@/components/Header';
 import MessagesList from '@/components/MessagesList';
-import { UploadItem, AssistantResult, ChatMessage } from '@/types/chat';
 import { readFileAsDataUrl } from '@/lib/files';
 import { useWindowDropzone } from '@/hooks/useWindowDropzone';
-import { useChat } from '@/hooks/useChat';
-import { isErrorWithMessage } from '@/types/error';
+import { useAnalysis } from '@/hooks/useAnalysis';
+import { isErrorWithMessage } from '@/lib/errors';
+
+export type UploadItem = {
+  id: string;
+  file: File;
+  preview: string;
+};
+
+export type AssistantResult = {
+  index: number;
+  ok: boolean;
+  text?: string;
+  error?: string;
+  image: string;
+};
+
+export type ChatMessage =
+  | {
+      id: string;
+      role: 'user';
+      question: string;
+      images: string[];
+      createdAt: number;
+    }
+  | {
+      id: string;
+      role: 'assistant';
+      results: AssistantResult[];
+      createdAt: number;
+      pending?: boolean;
+    };
 
 export default function Home() {
   // Chat state
@@ -73,7 +102,7 @@ export default function Home() {
   }, [question, items.length, submitting]);
 
   // chat
-  const chatMutation = useChat();
+  const analysis = useAnalysis();
 
   // Handlers
   async function handleAnalyze() {
@@ -109,7 +138,7 @@ export default function Home() {
       ]);
 
       // Call API
-      const data = await chatMutation.mutateAsync({
+      const analysisResponse = await analysis.mutateAsync({
         question: q,
         images,
       });
@@ -123,7 +152,7 @@ export default function Home() {
             m.createdAt === createdAt
           ) {
             const results: AssistantResult[] = images.map((img, idx) => {
-              const r = data.results.find(x => x.index === idx);
+              const r = analysisResponse.results.find(x => x.index === idx);
               return {
                 index: idx,
                 ok: !!r?.ok,

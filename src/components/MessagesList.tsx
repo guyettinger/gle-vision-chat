@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { ChatMessage } from '@/types/chat';
+
+import { ChatMessage } from '@/app/page';
 
 export default function MessagesList({
   messages,
@@ -10,7 +11,7 @@ export default function MessagesList({
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to the bottom when messages change
   useEffect(() => {
     listRef.current?.scrollTo({
       top: listRef.current.scrollHeight,
