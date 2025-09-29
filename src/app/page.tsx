@@ -18,7 +18,7 @@ export type UploadItem = {
   preview: string;
 };
 
-export type AssistantResult = {
+export type ImageAnalysisResult = {
   index: number;
   ok: boolean;
   text?: string;
@@ -37,7 +37,7 @@ export type ChatMessage =
   | {
       id: string;
       role: 'assistant';
-      results: AssistantResult[];
+      results: ImageAnalysisResult[];
       createdAt: number;
       pending?: boolean;
     };
@@ -116,14 +116,20 @@ export default function Home() {
     try {
       setSubmitting(true);
 
-      // Add user message
+      // Add a user message
       const userId = crypto.randomUUID();
       const assistantId = crypto.randomUUID();
       const createdAt = Date.now();
 
       setMessages(prev => [
         ...prev,
-        { id: userId, role: 'user', question: q, images, createdAt },
+        {
+          id: userId,
+          role: 'user',
+          question: q,
+          images,
+          createdAt,
+        },
         {
           id: assistantId,
           role: 'assistant',
@@ -148,7 +154,7 @@ export default function Home() {
       setMessages(prev =>
         prev.map(m => {
           if (m.role === 'assistant' && m.pending && m.createdAt === createdAt) {
-            const results: AssistantResult[] = images.map((img, idx) => {
+            const results: ImageAnalysisResult[] = images.map((img, idx) => {
               const r = analysisResponse.results.find(x => x.index === idx);
               return {
                 index: idx,
@@ -215,7 +221,7 @@ export default function Home() {
       <Header />
 
       {/* Chat area */}
-      <main className="mx-auto max-w-3xl w-full h-[calc(100vh-64px)] flex flex-col">
+      <main className="mx-auto max-w-3xl w-full h-[calc(100vh-64px)] p-4 flex flex-col">
         <MessagesList messages={messages} />
 
         {/* Composer (sticky bottom) */}
