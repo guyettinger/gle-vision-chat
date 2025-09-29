@@ -1,7 +1,6 @@
 import { isErrorWithMessage } from '@/lib/errors';
 import { openai } from '@/services/openai/openai';
 import { generateObject } from 'ai';
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 /**
@@ -101,17 +100,16 @@ export const analyzeImages = async (question: string, images: string[]) => {
       }
     });
   } catch (error: unknown) {
-    // OpenAI error
+    // OpenAI error — return an array of error results for each image.
     const message = isErrorWithMessage(error)
       ? error.message
       : 'Failed to analyze images. Please try again.';
     console.error('OpenAI error:', error);
-    // Map input images to images analyses by index
-    const results = images.map((_, index) => ({
+    // Map input images to analysis errors by index
+    return images.map((_, index) => ({
       index,
       ok: false,
       error: message,
     }));
-    return NextResponse.json({ results });
   }
 };
