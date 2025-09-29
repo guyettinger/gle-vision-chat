@@ -1,18 +1,64 @@
+
 import { generateObject } from 'ai';
 import { openai } from '@/utils/openai/openai';
 import { isErrorWithMessage } from '@/lib/errors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+/**
+ * Schema for a single image analysis result.
+ * Contains the index of the analyzed image and the analysis text.
+ */
 export const ImageAnalysisSchema = z.object({
+  /** The index of the image in the original array (0-based) */
   index: z.number(),
+  /** The analysis text generated for the image */
   text: z.string(),
 });
 
+/**
+ * Schema for the complete image analysis results.
+ * Contains an array of individual image analysis results.
+ */
 export const ImageAnalysisResultsSchema = z.object({
+  /** Array of image analysis results */
   results: z.array(ImageAnalysisSchema),
 });
 
+/**
+ * Analyzes multiple images using OpenAI's GPT-4o-mini model based on a user question.
+ *
+ * This function sends a question along with multiple images to the OpenAI API and returns
+ * analysis results for each image. The AI model provides succinct answers for each image,
+ * with specific details when counting or listing items.
+ *
+ * @param question - The question or prompt to guide the image analysis
+ * @param images - Array of base64-encoded image strings to be analyzed
+ *
+ * @returns Promise that resolves to an array of analysis results, where each result contains:
+ *   - `index`: The 0-based index of the image in the input array
+ *   - `ok`: Boolean indicating if the analysis was successful
+ *   - `text`: The analysis text (only present if `ok` is true)
+ *   - `error`: Error message (only present if `ok` is false)
+ *
+ * @example
+ * ```typescript
+ * const question = "How many people are in each image?";
+ * const images = ["data:image/jpeg;base64,/9j/4AAQ...", "data:image/png;base64,iVBORw0KG..."];
+ *
+ * const results = await analyzeImages(question, images);
+ * results.forEach(result => {
+ *   if (result.ok) {
+ *     console.log(`Image ${result.index}: ${result.text}`);
+ *   } else {
+ *     console.error(`Image ${result.index} failed: ${result.error}`);
+ *   }
+ * });
+ * ```
+ *
+ * @throws Will not throw errors directly, but returns error results in the response array
+ * when the OpenAI API call fails or when individual image analyses are missing.
+ */
 export const analyzeImages = async (question: string, images: string[]) => {
   try {
     // Generate image analysis results using the question and images
