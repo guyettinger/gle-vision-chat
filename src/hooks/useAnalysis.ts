@@ -1,8 +1,5 @@
+import { AnalysisRequest, AnalysisResponseSchema } from '@/app/api/analyses/route';
 import { useMutation } from '@tanstack/react-query';
-import {
-  AnalysisRequest,
-  AnalysisResponseSchema,
-} from '@/app/api/analyses/route';
 
 export const useAnalysis = () => {
   return useMutation({

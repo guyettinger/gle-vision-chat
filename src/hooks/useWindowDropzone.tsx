@@ -1,10 +1,6 @@
 import { useEffect } from 'react';
 
-export const useWindowDropzone = ({
-  onDrop,
-}: {
-  onDrop: (files: File[]) => Promise<void>;
-}) => {
+export const useWindowDropzone = ({ onDrop }: { onDrop: (files: File[]) => Promise<void> }) => {
   useEffect(() => {
     function onWindowDragOver(e: DragEvent) {
       e.preventDefault();
@@ -14,9 +10,7 @@ export const useWindowDropzone = ({
       e.preventDefault();
       const dt = e.dataTransfer;
       if (!dt) return;
-      const files = Array.from(dt.files || []).filter(f =>
-        f.type.startsWith('image/')
-      );
+      const files = Array.from(dt.files || []).filter(f => f.type.startsWith('image/'));
       if (files.length === 0) return;
       await onDrop(files);
     }

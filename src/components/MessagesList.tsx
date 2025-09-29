@@ -4,11 +4,7 @@ import { useEffect, useRef } from 'react';
 
 import { ChatMessage } from '@/app/page';
 
-export default function MessagesList({
-  messages,
-}: {
-  messages: ChatMessage[];
-}) {
+export default function MessagesList({ messages }: { messages: ChatMessage[] }) {
   const listRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to the bottom when messages change
@@ -20,15 +16,11 @@ export default function MessagesList({
   }, [messages]);
 
   return (
-    <div
-      ref={listRef}
-      className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4"
-    >
+    <div ref={listRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
       {messages.length === 0 && (
         <div className="text-center text-sm text-muted-foreground pt-16">
           <p>
-            Drop up to 4 images and ask a question. I will analyze each image
-            and reply per-image.
+            Drop up to 4 images and ask a question. I will analyze each image and reply per-image.
           </p>
         </div>
       )}
@@ -69,13 +61,9 @@ export default function MessagesList({
                     />
                     <div className="flex-1">
                       {msg.pending ? (
-                        <p className="text-sm text-muted-foreground">
-                          Analyzing...
-                        </p>
+                        <p className="text-sm text-muted-foreground">Analyzing...</p>
                       ) : res.ok ? (
-                        <p className="text-sm whitespace-pre-wrap">
-                          {res.text}
-                        </p>
+                        <p className="text-sm whitespace-pre-wrap">{res.text}</p>
                       ) : (
                         <p className="text-sm text-red-600" role="alert">
                           {res.error || 'Error'}

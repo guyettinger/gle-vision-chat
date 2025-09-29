@@ -1,7 +1,6 @@
-
-import { generateObject } from 'ai';
-import { openai } from '@/utils/openai/openai';
 import { isErrorWithMessage } from '@/lib/errors';
+import { openai } from '@/services/openai/openai';
+import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 

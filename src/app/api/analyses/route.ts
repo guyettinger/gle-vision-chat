@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
 import { isErrorWithMessage } from '@/lib/errors';
-import { analyzeImages } from '@/utils/openai/analyzeImages';
+import { analyzeImages } from '@/services/openai/analyzeImages';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 /**
@@ -131,9 +131,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ results });
   } catch (err: unknown) {
     // If an error occurred, respond with the error message
-    const message = isErrorWithMessage(err)
-      ? err.message
-      : 'Unexpected server error';
+    const message = isErrorWithMessage(err) ? err.message : 'Unexpected server error';
     console.error('Unexpected server error:', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }

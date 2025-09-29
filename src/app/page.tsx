@@ -1,13 +1,13 @@
 'use client';
 
-import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
 import Header from '@/components/Header';
 import MessagesList from '@/components/MessagesList';
-import { readFileAsDataUrl } from '@/lib/files';
-import { useWindowDropzone } from '@/hooks/useWindowDropzone';
 import { useAnalysis } from '@/hooks/useAnalysis';
+import { useWindowDropzone } from '@/hooks/useWindowDropzone';
 import { isErrorWithMessage } from '@/lib/errors';
+import { readFileAsDataUrl } from '@/lib/files';
+import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
 
 export type UploadItem = {
   id: string;
@@ -146,11 +146,7 @@ export default function Home() {
       // Update assistant message with real results
       setMessages(prev =>
         prev.map(m => {
-          if (
-            m.role === 'assistant' &&
-            m.pending &&
-            m.createdAt === createdAt
-          ) {
+          if (m.role === 'assistant' && m.pending && m.createdAt === createdAt) {
             const results: AssistantResult[] = images.map((img, idx) => {
               const r = analysisResponse.results.find(x => x.index === idx);
               return {
@@ -171,9 +167,7 @@ export default function Home() {
       setItems([]);
       setQuestion('');
     } catch (err: unknown) {
-      const message = isErrorWithMessage(err)
-        ? err.message
-        : 'Unexpected client error';
+      const message = isErrorWithMessage(err) ? err.message : 'Unexpected client error';
       console.error('Unexpected client error:', err);
       setGlobalError(message);
 
