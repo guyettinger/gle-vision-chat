@@ -31,10 +31,10 @@ describe('POST /api/analyses', () => {
       images: ['data:image/png;base64,AAA', 'data:image/png;base64,BBB'],
     });
 
-    const res = await POST(req as unknown as Request);
+    const res = await POST(req);
 
     expect(res.status).toBe(200);
-    const json = await (res as Response).json();
+    const json = await res.json();
     expect(json).toEqual({ results: mockResults });
     expect(analyzeImages).toHaveBeenCalledWith('What do you see?', [
       'data:image/png;base64,AAA',
@@ -45,10 +45,10 @@ describe('POST /api/analyses', () => {
   it('returns 400 when validation fails (missing question)', async () => {
     const req = makeRequest({ question: '', images: ['img'] });
 
-    const res = await POST(req as unknown as Request);
+    const res = await POST(req);
 
     expect(res.status).toBe(400);
-    const json = await (res as Response).json();
+    const json = await res.json();
     // Zod error message should include our custom message
     expect(typeof json.error).toBe('string');
     expect(json.error).toContain('Please provide a question');
@@ -60,10 +60,10 @@ describe('POST /api/analyses', () => {
 
     const req = makeRequest({ question: 'Q', images: ['img'] });
 
-    const res = await POST(req as unknown as Request);
+    const res = await POST(req);
 
     expect(res.status).toBe(500);
-    const json = await (res as Response).json();
+    const json = await res.json();
     expect(json).toEqual({ error: 'boom' });
   });
 });
