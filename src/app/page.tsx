@@ -238,7 +238,6 @@ export default function Home() {
             <div className="mb-2 flex flex-wrap gap-2">
               {items.map((item, idx) => (
                 <div key={item.id} className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.preview}
                     alt={`thumb-${idx}`}
