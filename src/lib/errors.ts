@@ -1,5 +1,5 @@
 /**
- * Objects that carry a string message.
+ * Error objects that carry a string message.
  */
 export interface ErrorWithMessage {
   /** The human-readable error message. */

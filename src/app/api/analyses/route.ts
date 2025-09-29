@@ -108,16 +108,14 @@ export type AnalysisResponse = z.infer<typeof AnalysisResponseSchema>;
  */
 export async function POST(req: Request) {
   try {
-    // Get the analysis request from the body
+    // Parse the analysis request from the body
     const body = await req.json();
     const analysisRequest = AnalysisRequestSchema.safeParse(body);
 
-    // If the analysis request is malformed
+    // If the analysis request is malformed, respond with an error
     if (!analysisRequest.success) {
-      // Respond with the error
       const error = analysisRequest.error;
       const message = error?.message || 'Invalid request.';
-      console.warn('Bad request:', message);
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
@@ -127,12 +125,11 @@ export async function POST(req: Request) {
     // Analyze the images
     const results = await analyzeImages(question, images);
 
-    // Respond with the results
+    // Respond with the analysis
     return NextResponse.json({ results });
   } catch (err: unknown) {
     // If an error occurred, respond with the error message
     const message = isErrorWithMessage(err) ? err.message : 'Unexpected server error';
-    console.error('Unexpected server error:', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

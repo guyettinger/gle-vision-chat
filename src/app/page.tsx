@@ -1,7 +1,7 @@
 'use client';
 
-import Header from '@/components/Header';
-import MessagesList from '@/components/MessagesList';
+import { Header } from '@/components/Header';
+import { MessagesList } from '@/components/MessagesList';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import { useWindowDropzone } from '@/hooks/useWindowDropzone';
 import { isErrorWithMessage } from '@/lib/errors';
@@ -58,7 +58,6 @@ export default function Home() {
         const files = acceptedFiles.slice(0, remaining);
         if (acceptedFiles.length > remaining) {
           const msg = 'You can upload up to 4 images.';
-          console.warn(msg);
           setGlobalError(msg);
         }
 
@@ -70,7 +69,6 @@ export default function Home() {
 
         setItems(prev => [...prev, ...newItems]);
       } catch (err) {
-        console.error('Error processing dropped files:', err);
         setGlobalError('Failed to process uploaded images.');
       }
     },
@@ -168,7 +166,6 @@ export default function Home() {
       setQuestion('');
     } catch (err: unknown) {
       const message = isErrorWithMessage(err) ? err.message : 'Unexpected client error';
-      console.error('Unexpected client error:', err);
       setGlobalError(message);
 
       // Mark assistant message as error for this request if exists
