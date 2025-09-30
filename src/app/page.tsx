@@ -14,11 +14,11 @@ import { useDropzone } from 'react-dropzone';
  * Represents an image the user selected for analysis.
  */
 export type UploadItem = {
-  /** id: Client-generated UUID used as a stable key in lists. */
+  /** Unique id */
   id: string;
-  /** file: The original File object from the dropzone/input */
+  /** The original File object from the dropzone/input */
   file: File;
-  /** preview: A base64 data URL used both for visual preview and as the payload sent to the analyzer. */
+  /** A base64 data URL used both for visual preview and as the payload sent to the analyzer. */
   preview: string;
 };
 
@@ -83,7 +83,7 @@ export default function Page() {
   /**
    * Triggers the image analysis workflow.
    */
-  async function analyzeImages() {
+  const analyzeImages = async () => {
     setGlobalError(null);
     if (!canSubmit) return;
 
@@ -137,10 +137,19 @@ export default function Page() {
           if (m.role === 'assistant' && m.pending && m.createdAt === createdAt) {
             const results: ImageAnalysisResult[] = images.map((img, idx) => {
               const r = analysisResponse.results.find(x => x.index === idx);
+
+              if (r?.ok) {
+                return {
+                  index: idx,
+                  ok: true,
+                  text: r.text,
+                  image: img,
+                };
+              }
+
               return {
                 index: idx,
-                ok: !!r?.ok,
-                text: r?.text,
+                ok: false,
                 error: r?.error,
                 image: img,
               };
@@ -179,24 +188,24 @@ export default function Page() {
     } finally {
       setSubmitting(false);
     }
-  }
+  };
 
   /**
    * Removes a single uploaded image from the composer by its id.
    *
    * @param id - The id of the UploadItem to remove
    */
-  function removeItem(id: string) {
+  const removeItem = (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
-  }
+  };
 
   /**
    * Clears all uploaded images from the composer and resets any global error.
    */
-  function clearAll() {
+  const clearAll = () => {
     setItems([]);
     setGlobalError(null);
-  }
+  };
 
   /**
    * Handles Enter-to-submit behavior for the question input.
@@ -205,12 +214,12 @@ export default function Page() {
    *
    * @param e - The keyboard event from the question input
    */
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (canSubmit) void analyzeImages();
     }
-  }
+  };
 
   return (
     <div className="min-h-screen">

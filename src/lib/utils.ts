@@ -7,6 +7,6 @@ import { twMerge } from 'tailwind-merge';
  * @param inputs - A list of class name values that can include strings, arrays, objects, or falsy values.
  * @returns The normalized and merged className string.
  */
-export function cn(...inputs: ClassValue[]) {
+export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs));
-}
+};

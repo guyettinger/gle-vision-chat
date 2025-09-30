@@ -9,8 +9,8 @@ import {
 /**
  * Server Action to analyze images using OpenAI
  */
-export async function analyzeImagesAction(
+export const analyzeImagesAction = async (
   imageAnalysisRequest: ImageAnalysisRequest
-): Promise<ImageAnalysisResponse> {
+): Promise<ImageAnalysisResponse> => {
   return await analyzeImages(imageAnalysisRequest);
-}
+};

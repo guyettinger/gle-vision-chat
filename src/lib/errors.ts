@@ -12,11 +12,11 @@ export interface ErrorWithMessage {
  * @param value - The unknown value to check.
  * @returns True if the value has a string `message` property; otherwise false.
  */
-export function isErrorWithMessage(value: unknown): value is ErrorWithMessage {
+export const isErrorWithMessage = (value: unknown): value is ErrorWithMessage => {
   return (
     typeof value === 'object' &&
     value !== null &&
     'message' in value &&
     typeof (value as { message?: unknown }).message === 'string'
   );
-}
+};

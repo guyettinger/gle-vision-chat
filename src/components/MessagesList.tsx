@@ -1,19 +1,12 @@
 'use client';
 
+import { type ImageAnalysisResponseItem } from '@/services/openai/analyzeImages';
 import { useEffect, useRef } from 'react';
 
 /**
  * Result of analyzing a single image.
  */
-export type ImageAnalysisResult = {
-  /** Position of the image in the original user upload array. */
-  index: number;
-  /** True if the analysis succeeded; false if it failed. */
-  ok: boolean;
-  /** Model's answer for this specific image; present when ok is true. */
-  text?: string;
-  /** User-friendly error message when ok is false. */
-  error?: string;
+export type ImageAnalysisResult = ImageAnalysisResponseItem & {
   /** Data URL for the image preview that was analyzed. */
   image: string;
 };
@@ -50,7 +43,7 @@ export type ChatMessage =
       pending?: boolean;
     };
 
-export function MessagesList({ messages }: { messages: ChatMessage[] }) {
+export const MessagesList = ({ messages }: { messages: ChatMessage[] }) => {
   // Auto-scroll to the bottom when messages change
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -126,4 +119,4 @@ export function MessagesList({ messages }: { messages: ChatMessage[] }) {
       })}
     </div>
   );
-}
+};

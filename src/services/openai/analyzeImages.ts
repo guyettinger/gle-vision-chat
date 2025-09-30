@@ -5,10 +5,11 @@ import { z } from 'zod';
 
 /**
  * Schema for validating image analysis request data.
- * Ensures the request contains a valid question and between 1-4 images.
  */
 export const ImageAnalysisRequestSchema = z.object({
+  /** The natural-language question guiding the analysis. Must be a non-empty string. */
   question: z.string().min(1, 'Please provide a question.'),
+  /** Array of base64 data URLs for up to 4 images to analyze. Must include at least 1 image. */
   images: z
     .array(z.string())
     .min(1, 'Please upload at least one image.')
@@ -16,39 +17,67 @@ export const ImageAnalysisRequestSchema = z.object({
 });
 
 /**
- * Image analysis request
+ * Image analysis request type
  */
 export type ImageAnalysisRequest = z.infer<typeof ImageAnalysisRequestSchema>;
 
 /**
- * Schema for validating image analysis response.
+ * Schema for validating a successful image analysis response.
+ */
+const ImageAnalysisSuccessSchema = z.object({
+  /** 0-based index of the image in the request payload. */
+  index: z.number(),
+  /** Discriminator flag for a successful analysis result. */
+  ok: z.literal(true),
+  /** The generated analysis text for the image. */
+  text: z.string(),
+});
+
+/**
+ * Schema for validating an error image analysis response.
+ */
+const ImageAnalysisErrorSchema = z.object({
+  /** 0-based index of the image in the request payload. */
+  index: z.number(),
+  /** Discriminator flag for an error result. */
+  ok: z.literal(false),
+  /** Human-readable error message explaining why analysis failed. */
+  error: z.string(),
+});
+
+/**
+ * Schema for validating image analysis response item.
  * Each result represents the outcome of analyzing a single image.
  */
-export const ImageAnalysisResponseItemSchema = z.object({
-  index: z.number(),
-  ok: z.boolean(),
-  text: z.string().optional(),
-  error: z.string().optional(),
-});
+export const ImageAnalysisResponseItemSchema = z.discriminatedUnion('ok', [
+  ImageAnalysisSuccessSchema,
+  ImageAnalysisErrorSchema,
+]);
+
+/**
+ *  Image analysis response item type
+ */
+export type ImageAnalysisResponseItem = z.infer<typeof ImageAnalysisResponseItemSchema>;
 
 /**
  * Schema for the full analysis response returned to the client.
  * Wraps an array of per-image results that can either be successful or contain an error.
  */
 export const ImageAnalysisResponseSchema = z.object({
+  /** Per-image analysis results mapped by index; items are success or error variants. */
   results: z.array(ImageAnalysisResponseItemSchema),
 });
 
 /**
- * Image analysis response
+ * Image analysis response type
  */
 export type ImageAnalysisResponse = z.infer<typeof ImageAnalysisResponseSchema>;
 
 /**
- * Schema for a single image analysis result.
+ * Schema for a single AI image analysis result.
  * Contains the index of the analyzed image and the analysis text.
  */
-export const ImageAnalysisResultSchema = z.object({
+const AIImageAnalysisResponseItemSchema = z.object({
   /** The index of the image in the original array (0-based) */
   index: z.number(),
   /** The analysis text generated for the image */
@@ -56,12 +85,12 @@ export const ImageAnalysisResultSchema = z.object({
 });
 
 /**
- * Schema for the complete image analysis results.
+ * Schema for the complete set of AI image analysis results.
  * Contains an array of individual image analysis results.
  */
-export const ImageAnalysisResultsSchema = z.object({
-  /** Array of image analysis results */
-  results: z.array(ImageAnalysisResultSchema),
+const AIImageAnalysisResponseSchema = z.object({
+  /** Array of image analyses */
+  results: z.array(AIImageAnalysisResponseItemSchema),
 });
 
 /**
@@ -106,7 +135,7 @@ export const analyzeImages = async ({
     // Generate image analysis results using the question and images
     const { object } = await generateObject({
       model: openai('gpt-4o-mini'),
-      schema: ImageAnalysisResultsSchema,
+      schema: AIImageAnalysisResponseSchema,
       messages: [
         {
           role: 'user',
@@ -150,7 +179,6 @@ export const analyzeImages = async ({
     const message = isErrorWithMessage(error)
       ? error.message
       : 'Failed to analyze images. Please try again.';
-    console.error('OpenAI error:', error);
     // Map input images to analysis errors by index
     return {
       results: images.map((_, index) => ({

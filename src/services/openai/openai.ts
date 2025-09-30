@@ -3,7 +3,6 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 /**
  * Preconfigured OpenAI client
- *
  * The client uses the OPENAI_API_KEY sourced from configuration.
  */
 export const openai = createOpenAI({
