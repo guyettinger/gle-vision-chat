@@ -1,8 +1,8 @@
 'use client';
 
+import { analyzeImagesAction } from '@/app/actions/analyzeImagesAction';
 import { Header } from '@/components/Header';
 import { ChatMessage, ImageAnalysisResult, MessagesList } from '@/components/MessagesList';
-import { useAnalysis } from '@/hooks/useAnalysis';
 import { isErrorWithMessage } from '@/lib/errors';
 import { readFileAsDataUrl } from '@/lib/files';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ export type UploadItem = {
   preview: string;
 };
 
-export default function Home() {
+export default function ChatPageClient() {
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -73,8 +73,7 @@ export default function Home() {
     return question.trim().length > 0 && items.length > 0 && !submitting;
   }, [question, items.length, submitting]);
 
-  // Analysis
-  const analysis = useAnalysis();
+  // Use the provided Server Action directly (no custom hook)
 
   // Handlers
   async function handleAnalyze() {
@@ -115,8 +114,8 @@ export default function Home() {
         },
       ]);
 
-      // Call API
-      const analysisResponse = await analysis.mutateAsync({
+      // Call Server Action directly
+      const analysisResponse = await analyzeImagesAction({
         question: q,
         images,
       });
@@ -126,7 +125,7 @@ export default function Home() {
         prev.map(m => {
           if (m.role === 'assistant' && m.pending && m.createdAt === createdAt) {
             const results: ImageAnalysisResult[] = images.map((img, idx) => {
-              const r = analysisResponse.results.find(x => x.index === idx);
+              const r = analysisResponse.find(x => x.index === idx);
               return {
                 index: idx,
                 ok: !!r?.ok,
@@ -195,6 +194,15 @@ export default function Home() {
       <main className="mx-auto max-w-3xl w-full h-[calc(100vh-64px)] p-4 flex flex-col">
         <MessagesList messages={messages} />
 
+        {/* Global error outside dropzone */}
+        {globalError && (
+          <div className="px-4 sm:px-6 pb-2">
+            <p className="text-xs text-red-600" role="alert">
+              {globalError}
+            </p>
+          </div>
+        )}
+
         {/* Composer (sticky bottom) */}
         <div
           {...getRootProps()}
@@ -205,88 +213,72 @@ export default function Home() {
               : 'border-border bg-background/95'
           )}
         >
-          <input {...getInputProps()} />
-
-          {globalError && (
-            <p className="text-xs text-red-600 mb-2" role="alert">
-              {globalError}
-            </p>
-          )}
-
-          {/* Selected thumbnails */}
           {items.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {items.map((item, idx) => (
-                <div key={item.id} className="relative">
+            <div className="my-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {items.map(item => (
+                <div key={item.id} className="relative group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.preview}
-                    alt={`thumb-${idx}`}
-                    className="h-30 w-30 object-cover rounded-md border"
+                    alt="preview"
+                    className="h-24 w-full object-cover rounded-md border"
                   />
                   <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      removeItem(item.id);
-                    }}
-                    className="absolute -top-1 -right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded"
+                    type="button"
+                    onClick={() => removeItem(item.id)}
+                    className="absolute top-1 right-1 text-[10px] px-2 py-1 rounded bg-black/60 text-white opacity-0 group-hover:opacity-100"
                     aria-label="Remove image"
                   >
-                    ✕
+                    Remove
                   </button>
                 </div>
               ))}
             </div>
           )}
+          <input {...getInputProps()} />
 
-          {/* Input row */}
+          {/* Composer row: upload + input + ask + clear */}
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={e => {
-                e.stopPropagation();
-                openFileDialog();
-              }}
-              className="px-3 py-2 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-accent/40"
-              disabled={submitting || items.length >= 4}
-              aria-label="Add images (you can also drop images here)"
+              onClick={openFileDialog}
+              className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-md border hover:bg-accent"
+              aria-label="Upload images"
             >
-              <ImageDown className="text-foreground/80" />
-              <span>Add images</span>
+              <ImageDown className="h-4 w-4" />
+              Upload images
             </button>
             <input
               type="text"
+              className="flex-1 px-3 py-2 rounded-md border text-sm"
+              placeholder="Ask a question about the images..."
               value={question}
               onChange={e => setQuestion(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question about your images..."
-              className="flex-1 rounded-md border px-3 py-2 bg-background text-sm"
-              disabled={submitting}
+              aria-label="Question input"
             />
             <button
+              type="button"
               onClick={handleAnalyze}
               disabled={!canSubmit}
               className={cn(
-                'px-4 py-2 rounded-md text-white text-sm inline-flex items-center gap-2',
-                canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                'inline-flex items-center gap-2 text-sm px-3 py-2 rounded-md border bg-blue-600 text-white disabled:opacity-50',
+                canSubmit ? 'hover:bg-blue-700' : ''
               )}
-              aria-label={submitting ? 'Analyzing' : 'Send message'}
+              aria-label="Submit question"
             >
-              <Send className="text-white" />
-              <span>{submitting ? 'Analyzing...' : 'Send'}</span>
+              <Send className="h-4 w-4" />
+              Ask
             </button>
             {items.length > 0 && (
               <button
-                onClick={e => {
-                  e.stopPropagation();
-                  clearAll();
-                }}
-                className="px-3 py-2 rounded-md border text-sm inline-flex items-center gap-2 hover:bg-accent/40"
-                disabled={submitting}
-                aria-label="Clear selected images"
+                type="button"
+                onClick={clearAll}
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-md border hover:bg-accent"
+                aria-label="Clear all images"
               >
-                <Trash className="text-foreground/90" />
-                <span>Clear</span>
+                <Trash className="h-4 w-4" />
+                Clear
               </button>
             )}
           </div>

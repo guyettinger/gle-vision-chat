@@ -4,6 +4,36 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 /**
+ * Schema for validating image analysis request data.
+ * Ensures the request contains a valid question and between 1-4 images.
+ */
+export const ImageAnalysisRequestSchema = z.object({
+  question: z.string().min(1, 'Please provide a question.'),
+  images: z
+    .array(z.string())
+    .min(1, 'Please upload at least one image.')
+    .max(4, 'You can upload up to 4 images.'),
+});
+
+export type ImageAnalysisRequest = z.infer<typeof ImageAnalysisRequestSchema>;
+
+/**
+ * Schema for validating image analysis response.
+ * Each result represents the outcome of analyzing a single image.
+ */
+export const ImageAnalysisResponseSchema =
+  z.object({
+    index: z.number(),
+    ok: z.boolean(),
+    text: z.string().optional(),
+    error: z.string().optional(),
+  })
+
+export const ImageAnalysisResponsesSchema = z.array(ImageAnalysisResponseSchema);
+
+export type ImageAnalysisResponse = z.infer<typeof ImageAnalysisResponsesSchema>;
+
+/**
  * Schema for a single image analysis result.
  * Contains the index of the analyzed image and the analysis text.
  */
@@ -57,7 +87,10 @@ export const ImageAnalysisResultsSchema = z.object({
  * @throws Will not throw errors directly, but returns error results in the response array
  * when the OpenAI API call fails or when individual image analyses are missing.
  */
-export const analyzeImages = async (question: string, images: string[]) => {
+export const analyzeImages = async ({
+  question,
+  images,
+}: ImageAnalysisRequest): Promise<ImageAnalysisResponse> => {
   try {
     // Generate image analysis results using the question and images
     const { object } = await generateObject({
