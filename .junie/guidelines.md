@@ -8,7 +8,6 @@ Tech stack
 
 - Runtime: Next.js 15 (App Router), React 19, TypeScript (strict), Turbopack.
 - Styling: Tailwind CSS v4 with CSS variables, shadcn/ui patterns (see components/ui).
-- State/data: @tanstack/react-query for mutations and caching.
 - Validation: zod for request/response schemas.
 - AI: ai and @ai-sdk/openai with OpenAI models.
 - Testing: Jest + ts-jest.

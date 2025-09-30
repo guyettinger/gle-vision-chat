@@ -11,9 +11,9 @@ import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 
 /**
- * Represents an image the user selected for analysis.
+ * Represents an image the user uploaded for analysis.
  */
-export type UploadItem = {
+type UploadedImage = {
   /** Unique id */
   id: string;
   /** The original File object from the dropzone/input */
@@ -27,7 +27,7 @@ export default function Page() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Composer state
-  const [items, setItems] = useState<UploadItem[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [question, setQuestion] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -37,25 +37,25 @@ export default function Page() {
     async (acceptedFiles: File[]) => {
       setGlobalError(null);
       try {
-        const remaining = Math.max(0, 4 - items.length);
+        const remaining = Math.max(0, 4 - uploadedImages.length);
         const files = acceptedFiles.slice(0, remaining);
         if (acceptedFiles.length > remaining) {
           const msg = 'You can upload up to 4 images.';
           setGlobalError(msg);
         }
 
-        const newItems: UploadItem[] = [];
+        const newUploadedImages: UploadedImage[] = [];
         for (const file of files) {
           const preview = await readFileAsDataUrl(file);
-          newItems.push({ id: crypto.randomUUID(), file, preview });
+          newUploadedImages.push({ id: crypto.randomUUID(), file, preview });
         }
 
-        setItems(prev => [...prev, ...newItems]);
+        setUploadedImages(prev => [...prev, ...newUploadedImages]);
       } catch {
         setGlobalError('Failed to process uploaded images.');
       }
     },
-    [items.length]
+    [uploadedImages.length]
   );
 
   // Dropzone
@@ -74,21 +74,23 @@ export default function Page() {
     noDragEventsBubbling: true,
   });
 
-  // Submission guard
-  const canSubmit = useMemo(() => {
-    return question.trim().length > 0 && items.length > 0 && !submitting;
-  }, [question, items.length, submitting]);
-
-  // Analyze images
   /**
-   * Triggers the image analysis workflow.
+   * Determine if the composer is in a submittable state.
+   */
+  const canSubmit = useMemo(() => {
+    return question.trim().length > 0 && uploadedImages.length > 0 && !submitting;
+  }, [question, uploadedImages.length, submitting]);
+
+  /**
+   * Trigger the image analysis workflow.
    */
   const analyzeImages = async () => {
+    // Clear previous errors
     setGlobalError(null);
     if (!canSubmit) return;
 
     // Get the uploaded images
-    const images = items.map(i => i.preview);
+    const images = uploadedImages.map(i => i.preview);
 
     // Get the question
     const q = question.trim();
@@ -150,7 +152,7 @@ export default function Page() {
               return {
                 index: idx,
                 ok: false,
-                error: r?.error,
+                error: r?.error ?? 'Unexpected server error',
                 image: img,
               };
             });
@@ -161,7 +163,7 @@ export default function Page() {
       );
 
       // Clear composer for the next question
-      setItems([]);
+      setUploadedImages([]);
       setQuestion('');
     } catch (err: unknown) {
       const message = isErrorWithMessage(err) ? err.message : 'Unexpected client error';
@@ -196,14 +198,14 @@ export default function Page() {
    * @param id - The id of the UploadItem to remove
    */
   const removeItem = (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
+    setUploadedImages(prev => prev.filter(i => i.id !== id));
   };
 
   /**
    * Clears all uploaded images from the composer and resets any global error.
    */
   const clearAll = () => {
-    setItems([]);
+    setUploadedImages([]);
     setGlobalError(null);
   };
 
@@ -249,9 +251,9 @@ export default function Page() {
               : 'border-border bg-background/95'
           )}
         >
-          {items.length > 0 && (
+          {uploadedImages.length > 0 && (
             <div className="my-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {items.map(item => (
+              {uploadedImages.map(item => (
                 <div key={item.id} className="relative group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -307,7 +309,7 @@ export default function Page() {
               <Send className="h-4 w-4" />
               Ask
             </button>
-            {items.length > 0 && (
+            {uploadedImages.length > 0 && (
               <button
                 type="button"
                 onClick={clearAll}
