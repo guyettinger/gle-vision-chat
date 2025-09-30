@@ -4,6 +4,26 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 /**
+ * Schema for a single AI image analysis result.
+ * Contains the index of the analyzed image and the analysis text.
+ */
+const AIImageAnalysisResponseItemSchema = z.object({
+  /** The index of the image in the original array (0-based) */
+  index: z.number(),
+  /** The analysis text generated for the image */
+  text: z.string(),
+});
+
+/**
+ * Schema for the complete set of AI image analysis results.
+ * Contains an array of individual image analysis results.
+ */
+const AIImageAnalysisResponseSchema = z.object({
+  /** Array of image analyses */
+  results: z.array(AIImageAnalysisResponseItemSchema),
+});
+
+/**
  * Schema for validating image analysis request data.
  */
 export const ImageAnalysisRequestSchema = z.object({
@@ -24,13 +44,9 @@ export type ImageAnalysisRequest = z.infer<typeof ImageAnalysisRequestSchema>;
 /**
  * Schema for validating a successful image analysis response.
  */
-const ImageAnalysisSuccessSchema = z.object({
-  /** 0-based index of the image in the request payload. */
-  index: z.number(),
+const ImageAnalysisSuccessSchema = AIImageAnalysisResponseItemSchema.extend({
   /** Discriminator flag for a successful analysis result. */
   ok: z.literal(true),
-  /** The generated analysis text for the image. */
-  text: z.string(),
 });
 
 /**
@@ -72,26 +88,6 @@ export const ImageAnalysisResponseSchema = z.object({
  * Image analysis response type
  */
 export type ImageAnalysisResponse = z.infer<typeof ImageAnalysisResponseSchema>;
-
-/**
- * Schema for a single AI image analysis result.
- * Contains the index of the analyzed image and the analysis text.
- */
-const AIImageAnalysisResponseItemSchema = z.object({
-  /** The index of the image in the original array (0-based) */
-  index: z.number(),
-  /** The analysis text generated for the image */
-  text: z.string(),
-});
-
-/**
- * Schema for the complete set of AI image analysis results.
- * Contains an array of individual image analysis results.
- */
-const AIImageAnalysisResponseSchema = z.object({
-  /** Array of image analyses */
-  results: z.array(AIImageAnalysisResponseItemSchema),
-});
 
 /**
  * Analyzes multiple images using OpenAI's GPT-4o-mini model based on a user question.
