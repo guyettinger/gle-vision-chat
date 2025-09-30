@@ -34,7 +34,7 @@ export type ChatMessage =
       question: string;
       /** Array of data URLs for previewing the uploaded images (max 4 enforced elsewhere). */
       images: string[];
-      /** Epoch millis timestamp for sorting/display. */
+      /** Timestamp for sorting/display. */
       createdAt: number;
     }
   | {
@@ -44,7 +44,7 @@ export type ChatMessage =
       role: 'assistant';
       /** One per input image, preserving order via the index field on each result. */
       results: ImageAnalysisResult[];
-      /** Epoch millis timestamp for sorting/display. */
+      /** Timestamp for sorting/display. */
       createdAt: number;
       /** When true, indicates the assistant response is still being computed. */
       pending?: boolean;
