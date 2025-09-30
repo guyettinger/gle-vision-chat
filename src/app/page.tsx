@@ -1,14 +1,12 @@
 'use client';
 
 import { Header } from '@/components/Header';
-import { PaperPlaneIcon } from '@/components/icons/PaperPlaneIcon';
-import { TrashIcon } from '@/components/icons/TrashIcon';
-import { TrayArrowDownIcon } from '@/components/icons/TrayArrowDownIcon';
-import { MessagesList } from '@/components/MessagesList';
+import { ChatMessage, ImageAnalysisResult, MessagesList } from '@/components/MessagesList';
 import { useAnalysis } from '@/hooks/useAnalysis';
-import { useWindowDropzone } from '@/hooks/useWindowDropzone';
 import { isErrorWithMessage } from '@/lib/errors';
 import { readFileAsDataUrl } from '@/lib/files';
+import { cn } from '@/lib/utils';
+import { ImageDown, Send, Trash } from 'lucide-react';
 import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 
@@ -17,30 +15,6 @@ export type UploadItem = {
   file: File;
   preview: string;
 };
-
-export type ImageAnalysisResult = {
-  index: number;
-  ok: boolean;
-  text?: string;
-  error?: string;
-  image: string;
-};
-
-export type ChatMessage =
-  | {
-      id: string;
-      role: 'user';
-      question: string;
-      images: string[];
-      createdAt: number;
-    }
-  | {
-      id: string;
-      role: 'assistant';
-      results: ImageAnalysisResult[];
-      createdAt: number;
-      pending?: boolean;
-    };
 
 export default function Home() {
   // Chat state
@@ -53,7 +27,7 @@ export default function Home() {
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   // Handle dropped images
-  const onDrop = useCallback(
+  const handleDrop = useCallback(
     async (acceptedFiles: File[]) => {
       setGlobalError(null);
       try {
@@ -71,7 +45,7 @@ export default function Home() {
         }
 
         setItems(prev => [...prev, ...newItems]);
-      } catch (err) {
+      } catch {
         setGlobalError('Failed to process uploaded images.');
       }
     },
@@ -85,7 +59,7 @@ export default function Home() {
     isDragActive,
     open: openFileDialog,
   } = useDropzone({
-    onDrop,
+    onDrop: handleDrop,
     accept: { 'image/*': [] },
     maxFiles: 4,
     multiple: true,
@@ -94,15 +68,12 @@ export default function Home() {
     noDragEventsBubbling: true,
   });
 
-  // Window Dropzone
-  useWindowDropzone({ onDrop });
-
   // Submission
   const canSubmit = useMemo(() => {
     return question.trim().length > 0 && items.length > 0 && !submitting;
   }, [question, items.length, submitting]);
 
-  // chat
+  // Analysis
   const analysis = useAnalysis();
 
   // Handlers
@@ -227,9 +198,12 @@ export default function Home() {
         {/* Composer (sticky bottom) */}
         <div
           {...getRootProps()}
-          className={`sticky bottom-0 px-4 sm:px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 
-            border-2 border-dashed rounded-xl transition-all 
-            ${isDragActive ? 'border-blue-600 ring-4 ring-blue-500/40 bg-blue-50/60' : 'border-border bg-background/95'}`}
+          className={cn(
+            'sticky bottom-0 px-4 sm:px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-2 border-dashed rounded-xl transition-all',
+            isDragActive
+              ? 'border-blue-600 ring-4 ring-blue-500/40 bg-blue-50/60'
+              : 'border-border bg-background/95'
+          )}
         >
           <input {...getInputProps()} />
 
@@ -244,6 +218,7 @@ export default function Home() {
             <div className="mb-2 flex flex-wrap gap-2">
               {items.map((item, idx) => (
                 <div key={item.id} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.preview}
                     alt={`thumb-${idx}`}
@@ -265,7 +240,7 @@ export default function Home() {
           )}
 
           {/* Input row */}
-          <div className={`flex items-center gap-2`}>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={e => {
@@ -276,7 +251,7 @@ export default function Home() {
               disabled={submitting || items.length >= 4}
               aria-label="Add images (you can also drop images here)"
             >
-              <TrayArrowDownIcon className="text-foreground/80" />
+              <ImageDown className="text-foreground/80" />
               <span>Add images</span>
             </button>
             <input
@@ -291,10 +266,13 @@ export default function Home() {
             <button
               onClick={handleAnalyze}
               disabled={!canSubmit}
-              className={`px-4 py-2 rounded-md text-white text-sm inline-flex items-center gap-2 ${canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+              className={cn(
+                'px-4 py-2 rounded-md text-white text-sm inline-flex items-center gap-2',
+                canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+              )}
               aria-label={submitting ? 'Analyzing' : 'Send message'}
             >
-              <PaperPlaneIcon className="text-white" />
+              <Send className="text-white" />
               <span>{submitting ? 'Analyzing...' : 'Send'}</span>
             </button>
             {items.length > 0 && (
@@ -307,7 +285,7 @@ export default function Home() {
                 disabled={submitting}
                 aria-label="Clear selected images"
               >
-                <TrashIcon className="text-foreground/90" />
+                <Trash className="text-foreground/90" />
                 <span>Clear</span>
               </button>
             )}

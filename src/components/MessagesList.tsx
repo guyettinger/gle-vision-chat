@@ -2,12 +2,57 @@
 
 import { useEffect, useRef } from 'react';
 
-import { ChatMessage } from '@/app/page';
+/**
+ * Result of analyzing a single image.
+ */
+export type ImageAnalysisResult = {
+  /** Position of the image in the original user upload array. */
+  index: number;
+  /** True if the analysis succeeded; false if it failed. */
+  ok: boolean;
+  /** Model's answer for this specific image; present when ok is true. */
+  text?: string;
+  /** User-friendly error message when ok is false. */
+  error?: string;
+  /** Data URL for the image preview that was analyzed. */
+  image: string;
+};
+
+/**
+ * A chat message in the conversation.
+ * Union of:
+ * - User message: the question text with up to 4 image data URLs provided by the user.
+ * - Assistant message: per-image analysis results returned by the model/service.
+ */
+export type ChatMessage =
+  | {
+      /** Unique id. */
+      id: string;
+      /** Role is 'user' for user messages. */
+      role: 'user';
+      /** The question the user asked about the images. */
+      question: string;
+      /** Array of data URLs for previewing the uploaded images (max 4 enforced elsewhere). */
+      images: string[];
+      /** Epoch millis timestamp for sorting/display. */
+      createdAt: number;
+    }
+  | {
+      /** Unique id. */
+      id: string;
+      /** Role is 'assistant' for assistant messages. */
+      role: 'assistant';
+      /** One per input image, preserving order via the index field on each result. */
+      results: ImageAnalysisResult[];
+      /** Epoch millis timestamp for sorting/display. */
+      createdAt: number;
+      /** When true, indicates the assistant response is still being computed. */
+      pending?: boolean;
+    };
 
 export function MessagesList({ messages }: { messages: ChatMessage[] }) {
-  const listRef = useRef<HTMLDivElement>(null);
-
   // Auto-scroll to the bottom when messages change
+  const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current?.scrollTo({
       top: listRef.current.scrollHeight,
@@ -34,6 +79,7 @@ export function MessagesList({ messages }: { messages: ChatMessage[] }) {
                 {msg.images.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {msg.images.map((img, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         key={i}
                         src={img}
@@ -54,6 +100,7 @@ export function MessagesList({ messages }: { messages: ChatMessage[] }) {
               <div className="space-y-3">
                 {msg.results.map((res, i) => (
                   <div key={i} className="flex items-start gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={res.image}
                       alt={`result-${i}`}
