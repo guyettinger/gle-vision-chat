@@ -15,29 +15,40 @@ export const ImageAnalysisRequestSchema = z.object({
     .max(4, 'You can upload up to 4 images.'),
 });
 
+/**
+ * Image analysis request
+ */
 export type ImageAnalysisRequest = z.infer<typeof ImageAnalysisRequestSchema>;
 
 /**
  * Schema for validating image analysis response.
  * Each result represents the outcome of analyzing a single image.
  */
-export const ImageAnalysisResponseSchema =
-  z.object({
-    index: z.number(),
-    ok: z.boolean(),
-    text: z.string().optional(),
-    error: z.string().optional(),
-  })
+export const ImageAnalysisResponseItemSchema = z.object({
+  index: z.number(),
+  ok: z.boolean(),
+  text: z.string().optional(),
+  error: z.string().optional(),
+});
 
-export const ImageAnalysisResponsesSchema = z.array(ImageAnalysisResponseSchema);
+/**
+ * Schema for the full analysis response returned to the client.
+ * Wraps an array of per-image results that can either be successful or contain an error.
+ */
+export const ImageAnalysisResponseSchema = z.object({
+  results: z.array(ImageAnalysisResponseItemSchema),
+});
 
-export type ImageAnalysisResponse = z.infer<typeof ImageAnalysisResponsesSchema>;
+/**
+ * Image analysis response
+ */
+export type ImageAnalysisResponse = z.infer<typeof ImageAnalysisResponseSchema>;
 
 /**
  * Schema for a single image analysis result.
  * Contains the index of the analyzed image and the analysis text.
  */
-export const ImageAnalysisSchema = z.object({
+export const ImageAnalysisResultSchema = z.object({
   /** The index of the image in the original array (0-based) */
   index: z.number(),
   /** The analysis text generated for the image */
@@ -50,7 +61,7 @@ export const ImageAnalysisSchema = z.object({
  */
 export const ImageAnalysisResultsSchema = z.object({
   /** Array of image analysis results */
-  results: z.array(ImageAnalysisSchema),
+  results: z.array(ImageAnalysisResultSchema),
 });
 
 /**
@@ -114,24 +125,26 @@ export const analyzeImages = async ({
     });
 
     // Map input image to analysis by index
-    return images.map((_, index) => {
-      const analysis = object.results.find(r => r.index === index);
-      if (analysis) {
-        // found analysis
-        return {
-          index,
-          ok: true,
-          text: analysis.text,
-        };
-      } else {
-        // missing analysis
-        return {
-          index,
-          ok: false,
-          error: 'No response received for this image.',
-        };
-      }
-    });
+    return {
+      results: images.map((_, index) => {
+        const analysis = object.results.find(r => r.index === index);
+        if (analysis) {
+          // found analysis
+          return {
+            index,
+            ok: true,
+            text: analysis.text,
+          };
+        } else {
+          // missing analysis
+          return {
+            index,
+            ok: false,
+            error: 'No response received for this image.',
+          };
+        }
+      }),
+    };
   } catch (error: unknown) {
     // OpenAI error — return an array of error results for each image.
     const message = isErrorWithMessage(error)
@@ -139,10 +152,12 @@ export const analyzeImages = async ({
       : 'Failed to analyze images. Please try again.';
     console.error('OpenAI error:', error);
     // Map input images to analysis errors by index
-    return images.map((_, index) => ({
-      index,
-      ok: false,
-      error: message,
-    }));
+    return {
+      results: images.map((_, index) => ({
+        index,
+        ok: false,
+        error: message,
+      })),
+    };
   }
 };

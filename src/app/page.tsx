@@ -10,13 +10,19 @@ import { ImageDown, Send, Trash } from 'lucide-react';
 import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 
+/**
+ * Represents an image the user selected for analysis.
+ */
 export type UploadItem = {
+  /** id: Client-generated UUID used as a stable key in lists. */
   id: string;
+  /** file: The original File object from the dropzone/input */
   file: File;
+  /** preview: A base64 data URL used both for visual preview and as the payload sent to the analyzer. */
   preview: string;
 };
 
-export default function ChatPageClient() {
+export default function Page() {
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -68,25 +74,30 @@ export default function ChatPageClient() {
     noDragEventsBubbling: true,
   });
 
-  // Submission
+  // Submission guard
   const canSubmit = useMemo(() => {
     return question.trim().length > 0 && items.length > 0 && !submitting;
   }, [question, items.length, submitting]);
 
-  // Use the provided Server Action directly (no custom hook)
-
-  // Handlers
-  async function handleAnalyze() {
+  // Analyze images
+  /**
+   * Triggers the image analysis workflow.
+   */
+  async function analyzeImages() {
     setGlobalError(null);
     if (!canSubmit) return;
 
+    // Get the uploaded images
     const images = items.map(i => i.preview);
+
+    // Get the question
     const q = question.trim();
 
     try {
+      // Start submission
       setSubmitting(true);
 
-      // Add a user message
+      // Add a user message and an assistant message
       const userId = crypto.randomUUID();
       const assistantId = crypto.randomUUID();
       const createdAt = Date.now();
@@ -114,18 +125,18 @@ export default function ChatPageClient() {
         },
       ]);
 
-      // Call Server Action directly
+      // Analyze images via a server action
       const analysisResponse = await analyzeImagesAction({
         question: q,
         images,
       });
 
-      // Update assistant message with real results
+      // Update the assistant message with results
       setMessages(prev =>
         prev.map(m => {
           if (m.role === 'assistant' && m.pending && m.createdAt === createdAt) {
             const results: ImageAnalysisResult[] = images.map((img, idx) => {
-              const r = analysisResponse.find(x => x.index === idx);
+              const r = analysisResponse.results.find(x => x.index === idx);
               return {
                 index: idx,
                 ok: !!r?.ok,
@@ -140,7 +151,7 @@ export default function ChatPageClient() {
         })
       );
 
-      // Clear composer for next question
+      // Clear composer for the next question
       setItems([]);
       setQuestion('');
     } catch (err: unknown) {
@@ -170,19 +181,34 @@ export default function ChatPageClient() {
     }
   }
 
+  /**
+   * Removes a single uploaded image from the composer by its id.
+   *
+   * @param id - The id of the UploadItem to remove
+   */
   function removeItem(id: string) {
     setItems(prev => prev.filter(i => i.id !== id));
   }
 
+  /**
+   * Clears all uploaded images from the composer and resets any global error.
+   */
   function clearAll() {
     setItems([]);
     setGlobalError(null);
   }
 
+  /**
+   * Handles Enter-to-submit behavior for the question input.
+   * Prevents default newline insertion when Enter is pressed without Shift and
+   * triggers analysis if the form is in a submittable state.
+   *
+   * @param e - The keyboard event from the question input
+   */
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (canSubmit) void handleAnalyze();
+      if (canSubmit) void analyzeImages();
     }
   }
 
@@ -192,9 +218,10 @@ export default function ChatPageClient() {
 
       {/* Chat area */}
       <main className="mx-auto max-w-3xl w-full h-[calc(100vh-64px)] p-4 flex flex-col">
+        {/* Messages */}
         <MessagesList messages={messages} />
 
-        {/* Global error outside dropzone */}
+        {/* Global error */}
         {globalError && (
           <div className="px-4 sm:px-6 pb-2">
             <p className="text-xs text-red-600" role="alert">
@@ -203,7 +230,7 @@ export default function ChatPageClient() {
           </div>
         )}
 
-        {/* Composer (sticky bottom) */}
+        {/* Composer */}
         <div
           {...getRootProps()}
           className={cn(
@@ -235,9 +262,10 @@ export default function ChatPageClient() {
               ))}
             </div>
           )}
+          {/* Dropzone */}
           <input {...getInputProps()} />
 
-          {/* Composer row: upload + input + ask + clear */}
+          {/* Composer inputs */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -259,7 +287,7 @@ export default function ChatPageClient() {
             />
             <button
               type="button"
-              onClick={handleAnalyze}
+              onClick={analyzeImages}
               disabled={!canSubmit}
               className={cn(
                 'inline-flex items-center gap-2 text-sm px-3 py-2 rounded-md border bg-blue-600 text-white disabled:opacity-50',
