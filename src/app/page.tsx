@@ -8,7 +8,12 @@ import { readFileAsDataUrl } from '@/lib/files';
 import { cn } from '@/lib/utils';
 import { ImageDown, Send, Trash } from 'lucide-react';
 import { KeyboardEvent, useCallback, useMemo, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { FileRejection, useDropzone } from 'react-dropzone';
+
+/**
+ * Max Images allowed per message
+ * */
+const MAX_IMAGES = 4;
 
 /**
  * Represents an image the user uploaded for analysis.
@@ -34,16 +39,28 @@ export default function Page() {
 
   // Handle dropped images
   const handleDrop = useCallback(
-    async (acceptedFiles: File[]) => {
+    async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
       setGlobalError(null);
       try {
-        const remaining = Math.max(0, 4 - uploadedImages.length);
+        // Only accept a certain number of images
+        const remaining = Math.max(0, MAX_IMAGES - uploadedImages.length);
         const files = acceptedFiles.slice(0, remaining);
         if (acceptedFiles.length > remaining) {
-          const msg = 'You can upload up to 4 images.';
+          const msg = `You can upload up to ${MAX_IMAGES} images.`;
           setGlobalError(msg);
+          return;
         }
 
+        // If there are rejections, show the error messages
+        if (rejectedFiles.length) {
+          const msg = rejectedFiles
+            .map(fileRejection => fileRejection.errors?.[0].message)
+            .join('\n');
+          setGlobalError(msg);
+          return;
+        }
+
+        // Create and add new uploaded images
         const newUploadedImages: UploadedImage[] = [];
         for (const file of files) {
           const preview = await readFileAsDataUrl(file);
@@ -67,7 +84,6 @@ export default function Page() {
   } = useDropzone({
     onDrop: handleDrop,
     accept: { 'image/*': [] },
-    maxFiles: 4,
     multiple: true,
     noClick: true,
     noKeyboard: true,
